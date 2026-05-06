@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<title>Activity Logger</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ActivityLog">
+<meta name="theme-color" content="#1a1a2e">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="status">
+    <div class="time" id="time">—</div>
+    <div class="last">Last: <span id="lastLabel">—</span></div>
+  </div>
+</header>
+
+<main>
+  <div class="labels-grid" id="labelsGrid"></div>
+</main>
+
+<div class="controls">
+  <button class="btn" id="addBtn">+ Add label</button>
+  <button class="btn" id="editBtn">Edit</button>
+</div>
+
+<div class="footer">
+  <button class="btn btn-primary" id="exportBtn">Export CSV</button>
+  <button class="btn btn-warning" id="eraseBtn">Erase log</button>
+  <button class="btn btn-warning" id="resetBtn">Reset labels</button>
+  <div class="stats" id="stats"></div>
+</div>
+
+<dialog id="addModal">
+  <form method="dialog">
+    <h3>New label</h3>
+    <input type="text" id="newLabelInput" placeholder="Label name" maxlength="60" autocomplete="off" autocapitalize="words">
+    <div class="modal-actions">
+      <button value="cancel">Cancel</button>
+      <button value="confirm" class="primary">Add</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="editModal">
+  <form method="dialog">
+    <h3>Edit label</h3>
+    <input type="text" id="editLabelInput" maxlength="60" autocomplete="off" autocapitalize="words">
+    <div class="modal-actions">
+      <button value="cancel">Cancel</button>
+      <button value="confirm" class="primary">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="confirmModal">
+  <form method="dialog">
+    <h3 id="confirmTitle">Confirm</h3>
+    <p id="confirmMessage"></p>
+    <div class="modal-actions">
+      <button value="cancel">Cancel</button>
+      <button value="confirm" class="warning">OK</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toast" class="toast" aria-live="polite"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
