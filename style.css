@@ -39,28 +39,63 @@ body {
 
 header {
   background: var(--bg-2);
-  padding: 14px 16px 10px;
+  padding: 12px 14px 10px;
   border-bottom: 1px solid var(--bg-3);
   flex-shrink: 0;
 }
 
-.status .time {
+.time {
   font-family: "SF Mono", ui-monospace, Menlo, monospace;
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.3px;
 }
 
-.status .last {
-  margin-top: 4px;
-  font-size: 14px;
-  color: var(--fg-2);
+.state-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  margin-top: 8px;
 }
 
-.status .last span {
-  color: var(--accent);
+.chip {
+  background: var(--bg-3);
+  border-radius: 8px;
+  padding: 6px 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.chip-name {
+  color: var(--fg-2);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
   font-weight: 600;
+}
+
+.chip-val {
+  color: var(--fg);
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chip.chip-set {
+  background: var(--accent-2);
+}
+
+.chip.chip-set .chip-name {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.chip.chip-set .chip-val {
+  color: #fff;
 }
 
 main {
@@ -68,6 +103,24 @@ main {
   overflow-y: auto;
   padding: 12px;
   -webkit-overflow-scrolling: touch;
+}
+
+.category {
+  margin-bottom: 18px;
+}
+
+.category:last-child {
+  margin-bottom: 8px;
+}
+
+.category-title {
+  margin: 0 0 8px;
+  padding: 0 2px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--fg-2);
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
 }
 
 .labels-grid {
@@ -83,16 +136,16 @@ main {
   font-size: 16px;
   font-weight: 500;
   font-family: inherit;
-  padding: 18px 12px;
+  padding: 16px 12px;
   border-radius: 14px;
-  min-height: 76px;
+  min-height: 64px;
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
   cursor: pointer;
   position: relative;
-  transition: transform 0.06s ease, background 0.12s ease;
+  transition: transform 0.06s ease, background 0.12s ease, border-color 0.12s ease;
   word-break: break-word;
 }
 
@@ -107,6 +160,17 @@ main {
   color: #fff;
 }
 
+.label-btn.selected {
+  background: var(--accent-2);
+  border-color: var(--accent);
+  color: #fff;
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.label-btn.selected:active {
+  background: var(--accent);
+}
+
 .label-btn.editing {
   background: var(--bg-3);
   animation: wiggle 0.6s ease-in-out infinite alternate;
@@ -114,6 +178,35 @@ main {
 
 .label-btn.editing:nth-child(2n) {
   animation-delay: -0.3s;
+}
+
+.label-btn.add-btn,
+.label-btn.add-btn.editing {
+  background: transparent;
+  border: 2px dashed var(--bg-3);
+  color: var(--fg-2);
+  font-size: 14px;
+  animation: none;
+}
+
+.label-btn.add-btn:active {
+  background: var(--bg-3);
+  border-color: var(--accent);
+  color: var(--fg);
+}
+
+.label-btn.add-btn:only-child {
+  grid-column: 1 / -1;
+}
+
+.empty-hint {
+  grid-column: 1 / -1;
+  text-align: center;
+  font-size: 13px;
+  color: var(--fg-2);
+  padding: 14px 8px;
+  border: 1px dashed var(--bg-3);
+  border-radius: 12px;
 }
 
 @keyframes wiggle {
@@ -134,7 +227,7 @@ main {
 }
 
 .icon-btn {
-  background: rgba(0,0,0,0.6);
+  background: rgba(0, 0, 0, 0.6);
   border: 2px solid var(--bg);
   color: #fff;
   width: 30px;
@@ -150,14 +243,8 @@ main {
   line-height: 1;
 }
 
-.icon-btn.delete { background: var(--warning); }
-
-.controls {
-  display: flex;
-  gap: 8px;
-  padding: 8px 12px 4px;
-  background: var(--bg-2);
-  flex-shrink: 0;
+.icon-btn.delete {
+  background: var(--warning);
 }
 
 .btn {
@@ -165,33 +252,41 @@ main {
   background: var(--bg-3);
   border: none;
   color: var(--fg);
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 500;
   font-family: inherit;
-  padding: 14px;
+  padding: 12px 6px;
   border-radius: 10px;
   cursor: pointer;
   -webkit-appearance: none;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.btn:active { opacity: 0.7; }
+.btn:active {
+  opacity: 0.7;
+}
 
-.btn-primary { background: var(--accent); color: #fff; }
-.btn-warning { background: var(--warning); color: #fff; }
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.btn-warning {
+  background: var(--warning);
+  color: #fff;
+}
 
 .footer {
-  padding: 6px 12px 12px;
+  padding: 8px 12px 12px;
   background: var(--bg-2);
   border-top: 1px solid var(--bg-3);
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   flex-shrink: 0;
-}
-
-.footer .btn {
-  font-size: 13px;
-  padding: 12px 6px;
 }
 
 .stats {
@@ -219,8 +314,17 @@ dialog::backdrop {
   -webkit-backdrop-filter: blur(4px);
 }
 
-dialog h3 { margin: 0 0 12px; font-size: 17px; }
-dialog p  { margin: 0 0 16px; color: var(--fg-2); font-size: 14px; line-height: 1.4; }
+dialog h3 {
+  margin: 0 0 12px;
+  font-size: 17px;
+}
+
+dialog p {
+  margin: 0 0 16px;
+  color: var(--fg-2);
+  font-size: 14px;
+  line-height: 1.4;
+}
 
 dialog input {
   width: 100%;
@@ -256,12 +360,19 @@ dialog input:focus {
   cursor: pointer;
 }
 
-.modal-actions button.primary { background: var(--accent); color: #fff; }
-.modal-actions button.warning { background: var(--warning); color: #fff; }
+.modal-actions button.primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.modal-actions button.warning {
+  background: var(--warning);
+  color: #fff;
+}
 
 .toast {
   position: fixed;
-  bottom: calc(140px + var(--safe-bottom));
+  bottom: calc(110px + var(--safe-bottom));
   left: 50%;
   transform: translateX(-50%) translateY(20px);
   background: var(--bg-3);
@@ -273,7 +384,7 @@ dialog input:focus {
   pointer-events: none;
   transition: opacity 0.2s, transform 0.2s;
   z-index: 1000;
-  box-shadow: 0 6px 24px rgba(0,0,0,0.5);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
   max-width: 80%;
   white-space: nowrap;
   overflow: hidden;
@@ -286,10 +397,13 @@ dialog input:focus {
 }
 
 @media (orientation: landscape) and (max-height: 500px) {
+  .state-row { grid-template-columns: repeat(4, 1fr); }
   .labels-grid { grid-template-columns: repeat(4, 1fr); }
-  .label-btn { min-height: 60px; padding: 12px 8px; font-size: 14px; }
+  .label-btn { min-height: 52px; padding: 10px 8px; font-size: 14px; }
+  .category { margin-bottom: 12px; }
 }
 
 @media (min-width: 600px) {
+  .state-row { grid-template-columns: repeat(4, 1fr); }
   .labels-grid { grid-template-columns: repeat(3, 1fr); }
 }

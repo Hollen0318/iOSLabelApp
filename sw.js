@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = 'v1';
+const VERSION = 'v2';
 const CACHE   = 'activity-logger-' + VERSION;
 
 const ASSETS = [

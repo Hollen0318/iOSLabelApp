@@ -1,72 +1,123 @@
 'use strict';
 
-const DEFAULT_LABELS = [
-  'EatingHungry',
-  'EatingFeelFull',
-  'EatingNeutral',
-  'NotEatingHungry',
-  'NotEatingNeutral',
-  'NotEatingSatiety',
-  'Walking',
-  'Standing',
-  'Sitting',
-  'Video Gaming',
-  'Watching TV',
-  'Lying',
-];
+const CATEGORY_ORDER = ['Posture', 'Ingestion', 'Fullness', 'Other'];
+
+const DEFAULT_CATEGORIES = {
+  Posture:   ['Standing', 'Sitting', 'Walking', 'Lying', 'Crouching', 'Running', 'Jumping'],
+  Ingestion: ['Eating', 'NotEating'],
+  Fullness:  ['Hungry', 'Neutral', 'Satiety'],
+  Other:     [],
+};
 
 const KEY = {
-  LABELS: 'iOSLabelApp.labels',
-  CSV:    'iOSLabelApp.csv',
-  LAST:   'iOSLabelApp.last',
+  CATS: 'iOSLabelApp.categories',
+  SEL:  'iOSLabelApp.selection',
+  CSV:  'iOSLabelApp.csv',
 };
+
+const CSV_HEADER = 'timestamp,' + CATEGORY_ORDER.join(',') + '\n';
+const NONE = '-1';
 
 const state = {
-  labels: loadLabels(),
-  lastLabel: localStorage.getItem(KEY.LAST) || null,
-  editing: false,
+  categories: loadCategories(),
+  selection:  loadSelection(),
+  editing:    false,
 };
 
-function loadLabels() {
-  const raw = localStorage.getItem(KEY.LABELS);
+function cloneDefaults() {
+  const out = {};
+  for (const k of CATEGORY_ORDER) out[k] = [...DEFAULT_CATEGORIES[k]];
+  return out;
+}
+
+function emptySelection() {
+  const out = {};
+  for (const k of CATEGORY_ORDER) out[k] = null;
+  return out;
+}
+
+function loadCategories() {
+  const raw = localStorage.getItem(KEY.CATS);
   if (raw) {
     try {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.every(s => typeof s === 'string')) return parsed;
+      if (parsed && typeof parsed === 'object' &&
+          CATEGORY_ORDER.every(k => Array.isArray(parsed[k]) && parsed[k].every(s => typeof s === 'string'))) {
+        const out = {};
+        for (const k of CATEGORY_ORDER) out[k] = [...parsed[k]];
+        return out;
+      }
     } catch (_) {}
   }
-  return [...DEFAULT_LABELS];
+  return cloneDefaults();
 }
 
-function saveLabels() {
-  localStorage.setItem(KEY.LABELS, JSON.stringify(state.labels));
+function saveCategories() {
+  localStorage.setItem(KEY.CATS, JSON.stringify(state.categories));
+}
+
+function loadSelection() {
+  const raw = localStorage.getItem(KEY.SEL);
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        const out = {};
+        for (const k of CATEGORY_ORDER) {
+          const v = parsed[k];
+          out[k] = (typeof v === 'string' && v.length > 0) ? v : null;
+        }
+        return out;
+      }
+    } catch (_) {}
+  }
+  return emptySelection();
+}
+
+function saveSelection() {
+  localStorage.setItem(KEY.SEL, JSON.stringify(state.selection));
 }
 
 function getCsv() {
   return localStorage.getItem(KEY.CSV) || '';
 }
 
-function appendCsvRow(ts, label) {
+function ensureCsvSchema() {
+  // Old single-column CSV (`timestamp,label`) is incompatible with the new four-column layout.
+  const csv = getCsv();
+  if (!csv) return;
+  if (!csv.startsWith(CSV_HEADER)) {
+    localStorage.removeItem(KEY.CSV);
+    showToast('Old log cleared — schema changed');
+  }
+}
+
+function csvCell(v) {
+  if (v == null) return NONE;
+  if (/[",\n\r]/.test(v)) return '"' + v.replace(/"/g, '""') + '"';
+  return v;
+}
+
+function appendCsvRow(ts, sel) {
   const existing = getCsv();
-  const header = existing ? '' : 'timestamp,label\n';
-  const escaped = /[",\n\r]/.test(label) ? `"${label.replace(/"/g, '""')}"` : label;
-  localStorage.setItem(KEY.CSV, existing + header + ts + ',' + escaped + '\n');
+  const head = existing ? '' : CSV_HEADER;
+  const cells = CATEGORY_ORDER.map(k => csvCell(sel[k]));
+  localStorage.setItem(KEY.CSV, existing + head + ts + ',' + cells.join(',') + '\n');
 }
 
 function rowCount() {
   const csv = getCsv();
   if (!csv) return 0;
   const lines = csv.split('\n');
-  // header + final empty line after last \n
-  return Math.max(0, lines.length - 2);
+  return Math.max(0, lines.length - 2); // header + trailing newline
 }
 
 function timestamp() {
   const d = new Date();
   const p = (n, w = 2) => String(n).padStart(w, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}-` +
-         `${p(d.getHours())}-${p(d.getMinutes())}-${p(d.getSeconds())}.` +
-         `${p(d.getMilliseconds(), 3)}`;
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + '-' +
+         p(d.getHours()) + '-' + p(d.getMinutes()) + '-' + p(d.getSeconds()) + '.' +
+         p(d.getMilliseconds(), 3);
 }
 
 function fileTimestamp() {
@@ -74,90 +125,151 @@ function fileTimestamp() {
 }
 
 function render() {
-  renderLabels();
-  renderLast();
+  renderCategories();
+  renderState();
   renderStats();
   document.getElementById('editBtn').textContent = state.editing ? 'Done' : 'Edit';
 }
 
-function renderLabels() {
-  const grid = document.getElementById('labelsGrid');
-  grid.innerHTML = '';
-  state.labels.forEach((label, i) => {
-    const btn = document.createElement('button');
-    btn.className = 'label-btn' + (state.editing ? ' editing' : '');
-    btn.type = 'button';
+function renderCategories() {
+  const root = document.getElementById('categoriesRoot');
+  root.innerHTML = '';
 
-    const text = document.createElement('span');
-    text.textContent = label;
-    btn.appendChild(text);
+  for (const cat of CATEGORY_ORDER) {
+    const section = document.createElement('section');
+    section.className = 'category';
+
+    const h = document.createElement('h2');
+    h.className = 'category-title';
+    h.textContent = cat;
+    section.appendChild(h);
+
+    const grid = document.createElement('div');
+    grid.className = 'labels-grid';
+
+    state.categories[cat].forEach((label, i) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      const isSel = state.selection[cat] === label;
+      btn.className = 'label-btn' +
+        (state.editing ? ' editing' : '') +
+        (isSel ? ' selected' : '');
+
+      const text = document.createElement('span');
+      text.textContent = label;
+      btn.appendChild(text);
+
+      if (state.editing) {
+        const actions = document.createElement('div');
+        actions.className = 'edit-actions';
+
+        const editIcon = document.createElement('button');
+        editIcon.type = 'button';
+        editIcon.className = 'icon-btn';
+        editIcon.textContent = '✎';
+        editIcon.setAttribute('aria-label', 'Edit ' + label);
+        editIcon.addEventListener('click', e => { e.stopPropagation(); promptEdit(cat, i); });
+
+        const delIcon = document.createElement('button');
+        delIcon.type = 'button';
+        delIcon.className = 'icon-btn delete';
+        delIcon.textContent = '×';
+        delIcon.setAttribute('aria-label', 'Delete ' + label);
+        delIcon.addEventListener('click', e => { e.stopPropagation(); deleteLabel(cat, i); });
+
+        actions.appendChild(editIcon);
+        actions.appendChild(delIcon);
+        btn.appendChild(actions);
+
+        btn.addEventListener('click', () => promptEdit(cat, i));
+      } else {
+        btn.addEventListener('click', () => onLabelTap(cat, label, btn));
+      }
+
+      grid.appendChild(btn);
+    });
 
     if (state.editing) {
-      const actions = document.createElement('div');
-      actions.className = 'edit-actions';
-
-      const editIcon = document.createElement('button');
-      editIcon.type = 'button';
-      editIcon.className = 'icon-btn';
-      editIcon.textContent = '✎';
-      editIcon.setAttribute('aria-label', 'Edit ' + label);
-      editIcon.addEventListener('click', e => { e.stopPropagation(); promptEdit(i); });
-
-      const delIcon = document.createElement('button');
-      delIcon.type = 'button';
-      delIcon.className = 'icon-btn delete';
-      delIcon.textContent = '×';
-      delIcon.setAttribute('aria-label', 'Delete ' + label);
-      delIcon.addEventListener('click', e => { e.stopPropagation(); deleteLabel(i); });
-
-      actions.appendChild(editIcon);
-      actions.appendChild(delIcon);
-      btn.appendChild(actions);
-
-      btn.addEventListener('click', () => promptEdit(i));
-    } else {
-      btn.addEventListener('click', () => onLabelTap(label, btn));
+      const addBtn = document.createElement('button');
+      addBtn.type = 'button';
+      addBtn.className = 'label-btn add-btn';
+      const addText = document.createElement('span');
+      addText.textContent = '+ Add';
+      addBtn.appendChild(addText);
+      addBtn.addEventListener('click', () => promptAdd(cat));
+      grid.appendChild(addBtn);
+    } else if (state.categories[cat].length === 0) {
+      const hint = document.createElement('div');
+      hint.className = 'empty-hint';
+      hint.textContent = 'Tap Edit to add labels';
+      grid.appendChild(hint);
     }
 
-    grid.appendChild(btn);
-  });
+    section.appendChild(grid);
+    root.appendChild(section);
+  }
 }
 
-function renderLast() {
-  document.getElementById('lastLabel').textContent = state.lastLabel || '—';
+function renderState() {
+  const el = document.getElementById('stateRow');
+  el.innerHTML = '';
+  for (const cat of CATEGORY_ORDER) {
+    const v = state.selection[cat];
+    const chip = document.createElement('div');
+    chip.className = 'chip' + (v ? ' chip-set' : '');
+
+    const name = document.createElement('span');
+    name.className = 'chip-name';
+    name.textContent = cat;
+
+    const val = document.createElement('span');
+    val.className = 'chip-val';
+    val.textContent = v == null ? '—' : v;
+
+    chip.appendChild(name);
+    chip.appendChild(val);
+    el.appendChild(chip);
+  }
 }
 
 function renderStats() {
-  document.getElementById('stats').textContent = `${rowCount()} entries logged`;
+  document.getElementById('stats').textContent = rowCount() + ' entries logged';
 }
 
 function tickClock() {
   document.getElementById('time').textContent = timestamp();
 }
 
-function onLabelTap(label, btn) {
+function onLabelTap(cat, label, btn) {
+  const previous = state.selection[cat];
+  const next = (previous === label) ? null : label;
+  state.selection[cat] = next;
+
   const ts = timestamp();
   try {
-    appendCsvRow(ts, label);
+    appendCsvRow(ts, state.selection);
   } catch (e) {
+    state.selection[cat] = previous;
     showToast('Storage full — export & erase the log');
     return;
   }
-  state.lastLabel = label;
-  localStorage.setItem(KEY.LAST, label);
-  renderLast();
+
+  saveSelection();
+  renderCategories();
+  renderState();
   renderStats();
 
   btn.classList.add('flash');
   setTimeout(() => btn.classList.remove('flash'), 220);
 
   if (navigator.vibrate) navigator.vibrate(8);
-  showToast('+ ' + label);
+  showToast(next ? cat + ': ' + label : cat + ' cleared');
 }
 
-function promptAdd() {
+function promptAdd(cat) {
   const modal = document.getElementById('addModal');
   const input = document.getElementById('newLabelInput');
+  document.getElementById('addModalTitle').textContent = 'New ' + cat + ' label';
   input.value = '';
   modal.showModal();
   setTimeout(() => input.focus(), 50);
@@ -167,17 +279,19 @@ function promptAdd() {
     if (modal.returnValue !== 'confirm') return;
     const v = input.value.trim();
     if (!v) return;
-    if (state.labels.includes(v)) { showToast('Label already exists'); return; }
-    state.labels.push(v);
-    saveLabels();
-    renderLabels();
+    if (state.categories[cat].includes(v)) { showToast('Already exists in ' + cat); return; }
+    state.categories[cat].push(v);
+    saveCategories();
+    renderCategories();
   });
 }
 
-function promptEdit(index) {
+function promptEdit(cat, index) {
   const modal = document.getElementById('editModal');
   const input = document.getElementById('editLabelInput');
-  input.value = state.labels[index];
+  const oldName = state.categories[cat][index];
+  document.getElementById('editModalTitle').textContent = 'Edit ' + cat + ' label';
+  input.value = oldName;
   modal.showModal();
   setTimeout(() => { input.focus(); input.select(); }, 50);
 
@@ -186,20 +300,30 @@ function promptEdit(index) {
     if (modal.returnValue !== 'confirm') return;
     const v = input.value.trim();
     if (!v) return;
-    if (v === state.labels[index]) return;
-    if (state.labels.includes(v)) { showToast('Label already exists'); return; }
-    state.labels[index] = v;
-    saveLabels();
-    renderLabels();
+    if (v === oldName) return;
+    if (state.categories[cat].includes(v)) { showToast('Already exists in ' + cat); return; }
+    state.categories[cat][index] = v;
+    if (state.selection[cat] === oldName) {
+      state.selection[cat] = v;
+      saveSelection();
+    }
+    saveCategories();
+    renderCategories();
+    renderState();
   });
 }
 
-function deleteLabel(index) {
-  const name = state.labels[index];
-  confirmAction('Delete label?', `Remove "${name}"? Existing log entries are kept.`, () => {
-    state.labels.splice(index, 1);
-    saveLabels();
-    renderLabels();
+function deleteLabel(cat, index) {
+  const name = state.categories[cat][index];
+  confirmAction('Delete label?', 'Remove "' + name + '" from ' + cat + '? Existing log entries are kept.', () => {
+    state.categories[cat].splice(index, 1);
+    if (state.selection[cat] === name) {
+      state.selection[cat] = null;
+      saveSelection();
+    }
+    saveCategories();
+    renderCategories();
+    renderState();
   });
 }
 
@@ -217,11 +341,10 @@ function confirmAction(title, message, onConfirm) {
 function exportCsv() {
   const csv = getCsv();
   if (!csv) { showToast('Nothing to export'); return; }
-  const filename = `activity-log-${fileTimestamp()}.csv`;
+  const filename = 'activity-log-' + fileTimestamp() + '.csv';
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
   const file = new File([blob], filename, { type: 'text/csv' });
 
-  // Prefer the iOS share sheet (Files, AirDrop, Mail, etc.)
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     navigator.share({ files: [file], title: 'Activity log' })
       .catch(err => { if (err && err.name !== 'AbortError') downloadBlob(blob, filename); });
@@ -245,11 +368,9 @@ function eraseLog() {
   const n = rowCount();
   if (n === 0) { showToast('Log already empty'); return; }
   confirmAction('Erase log?',
-    `Delete all ${n} logged entries? Labels are kept. This cannot be undone.`,
+    'Delete all ' + n + ' logged entries? Labels and current selections are kept. This cannot be undone.',
     () => {
       localStorage.removeItem(KEY.CSV);
-      state.lastLabel = null;
-      localStorage.removeItem(KEY.LAST);
       render();
       showToast('Log erased');
     });
@@ -257,11 +378,17 @@ function eraseLog() {
 
 function resetLabels() {
   confirmAction('Reset labels?',
-    'Restore the default label list. Custom labels are removed; the log is kept.',
+    'Restore the default category labels. Custom labels are removed; the log is kept; selections that referenced removed labels are cleared.',
     () => {
-      state.labels = [...DEFAULT_LABELS];
-      saveLabels();
-      renderLabels();
+      state.categories = cloneDefaults();
+      for (const k of CATEGORY_ORDER) {
+        if (state.selection[k] && !state.categories[k].includes(state.selection[k])) {
+          state.selection[k] = null;
+        }
+      }
+      saveCategories();
+      saveSelection();
+      render();
       showToast('Labels reset');
     });
 }
@@ -280,12 +407,12 @@ function showToast(msg) {
   toastTimer = setTimeout(() => t.classList.remove('show'), 1300);
 }
 
-document.getElementById('addBtn').addEventListener('click', promptAdd);
 document.getElementById('editBtn').addEventListener('click', toggleEdit);
 document.getElementById('exportBtn').addEventListener('click', exportCsv);
 document.getElementById('eraseBtn').addEventListener('click', eraseLog);
 document.getElementById('resetBtn').addEventListener('click', resetLabels);
 
+ensureCsvSchema();
 render();
 tickClock();
 setInterval(tickClock, 50);
